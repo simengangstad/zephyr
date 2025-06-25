@@ -46,11 +46,11 @@ static inline uint32_t fcb_flash_magic(const struct fcb *fcbp)
 	return (fcbp->f_magic ^ ~MK32(ev));
 }
 
-struct fcb_disk_area {
+struct __packed fcb_disk_area {
 	uint32_t fd_magic;
 	uint8_t fd_ver;
-	uint8_t _pad;
 	uint16_t fd_id;
+	uint8_t fd_checksum;
 };
 
 int fcb_put_len(const struct fcb *fcbp, uint8_t *buf, uint16_t len);
@@ -77,6 +77,7 @@ int fcb_elem_endmarker(struct fcb *fcbp, struct fcb_entry *loc, uint8_t *crc8p);
 
 int fcb_sector_hdr_init(struct fcb *fcbp, struct flash_sector *sector, uint16_t id);
 int fcb_sector_hdr_read(struct fcb *fcbp, struct flash_sector *sector, struct fcb_disk_area *fdap);
+uint8_t fcb_sector_hdr_checksum(struct fcb_disk_area *fdap);
 
 #ifdef __cplusplus
 }

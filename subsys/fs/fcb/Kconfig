@@ -23,4 +23,13 @@ config FCB_ALLOW_FIXED_ENDMARKER
 	  This allows the FCB instances to disable CRC checks in
 	  favor of increased write throughput.
 
+config FCB_ERASE_SECTOR_ON_HDR_CHECKSUM_ERROR
+	bool "Erase sector when checksum error in header is detected"
+	default n
+	help
+	  This prevents the initialization of the FCB to fail if one
+	  or more sector headers are corrupted. This can happen when
+	  power loss occurs whilst writing the sector header.
+
+
 endif

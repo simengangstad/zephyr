@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <zephyr/sys/crc.h>
+
 #include <zephyr/device.h>
 #include <zephyr/drivers/flash.h>
 #include <zephyr/fs/fcb.h>
@@ -121,6 +123,15 @@ int fcb_init(int f_area_id, struct fcb *fcbp)
 	for (i = 0; i < fcbp->f_sector_cnt; i++) {
 		sector = &fcbp->f_sectors[i];
 		rc = fcb_sector_hdr_read(fcbp, sector, &fda);
+#ifdef CONFIG_FCB_ERASE_SECTOR_ON_HDR_CHECKSUM_ERROR
+		if (rc == -ENODATA) {
+			// Invalid checksum, sector should be erased
+			rc = fcb_erase_sector(fcbp, sector);
+			if (rc) {
+				return rc;
+			}
+		}
+#endif
 		if (rc < 0) {
 			return rc;
 		}
@@ -259,9 +270,8 @@ int fcb_sector_hdr_init(struct fcb *fcbp, struct flash_sector *sector, uint16_t 
 
 	fda.fd_magic = fcb_flash_magic(fcbp);
 	fda.fd_ver = fcbp->f_version;
-	fda._pad = fcbp->f_erase_value;
 	fda.fd_id = id;
-
+	fda.fd_checksum = fcb_sector_hdr_checksum(&fda);
 	rc = fcb_flash_write(fcbp, sector, 0, &fda, sizeof(fda));
 	if (rc != 0) {
 		return -EIO;
@@ -290,10 +300,24 @@ int fcb_sector_hdr_read(struct fcb *fcbp, struct flash_sector *sector, struct fc
 	if (fdap->fd_magic == MK32(fcbp->f_erase_value)) {
 		return 0;
 	}
+	if (fdap->fd_checksum != fcb_sector_hdr_checksum(fdap)) {
+		return -ENODATA;
+	}
 	if (fdap->fd_magic != fcb_flash_magic(fcbp)) {
 		return -ENOMSG;
 	}
 	return 1;
+}
+
+/**
+ * Calculates the checksum for the sector header.
+ */
+uint8_t fcb_sector_hdr_checksum(struct fcb_disk_area *fdap)
+{
+	const uint8_t *const buffer = (const uint8_t *const)fdap;
+	const size_t size = sizeof(struct fcb_disk_area) - sizeof(fdap->fd_checksum);
+
+	return crc8_ccitt(CRC8_CCITT_INITIAL_VALUE, buffer, size);
 }
 
 /**
